@@ -1,4 +1,6 @@
-const bombCount: number = 40;
+const bombCountOptions: Array<number> = [25, 50, 100]
+let bombCountIndex: number = 2;
+let bombCount: number = bombCountOptions[bombCountIndex]
 const tileSize: number = 8;
 const screenW = screen.width
 const screenH = screen.height
@@ -9,10 +11,49 @@ const boardH = resolution * tileSize
 
 const offsetX = Math.idiv(screenW - boardW, 2)
 const offsetY = Math.idiv(screenH - boardH, 2)
-let pole:Array<Array<tile>> = [];
+let pole: Array<Array<tile>> = [];
 let firstTurn: boolean = true;
-let cursorX: number = 0;
-let cursorY: number = 0;
+let cursorX: number = 7;
+let cursorY: number = 7;
+
+enum GameState {
+    Home,
+    Playing,
+    GameOver
+}
+let gameState: GameState = GameState.Home
+
+function startGame(bombs: number) {
+    firstTurn = true
+    cursorX = Math.idiv(resolution, 2)
+    cursorY = Math.idiv(resolution, 2)
+
+    pole = []
+    for (let y = 0; y < resolution; y++) {
+        let row: Array<tile> = []
+        for (let x = 0; x < resolution; x++) {
+            row.push({
+                state: status.free,
+                marked: false,
+                revealed: false,
+                firstTile: false,
+                locationY: y,
+                locationX: x
+            })
+        }
+        pole.push(row)
+    }
+
+    gameState = GameState.Playing
+}
+
+function drawHome() {
+    screen.fill(1)
+
+    screen.printCenter("MINES", screenH / 2 - 20, 7)
+    screen.printCenter("A = START", screenH / 2, 7)
+    screen.printCenter("B = (later) options", screenH / 2 + 12, 7)
+}
 
 const tileFreeImg: Image = img`
     b 3 3 3 3 3 3 3
@@ -146,22 +187,46 @@ const tileRevealedBomb: Image = img`
     b b b b b b b b
 `
 const tileNumberImages: Array<Image> = [tileNumber0, tileNumber1, tileNumber2, tileNumber3, tileNumber4, tileNumber5, tileNumber6, tileNumber7, tileNumber8, tileRevealedBomb]
- 
+
 controller.left.onEvent(ControllerButtonEvent.Pressed, function () {
-    music.play(music.melodyPlayable(music.footstep), music.PlaybackMode.InBackground)
-    cursorX = Math.max(0, cursorX - 1)
+    if(gameState === GameState.Playing){
+        music.play(music.melodyPlayable(music.footstep), music.PlaybackMode.InBackground)
+        cursorX = Math.max(0, cursorX - 1)
+    }
 })
 controller.right.onEvent(ControllerButtonEvent.Pressed, function () {
-    music.play(music.melodyPlayable(music.footstep), music.PlaybackMode.InBackground)
-    cursorX = Math.min(resolution-1, cursorX + 1)
+    if(gameState === GameState.Playing){
+        music.play(music.melodyPlayable(music.footstep), music.PlaybackMode.InBackground)
+        cursorX = Math.min(resolution - 1, cursorX + 1)
+    }
 })
 controller.up.onEvent(ControllerButtonEvent.Pressed, function () {
-    music.play(music.melodyPlayable(music.footstep), music.PlaybackMode.InBackground)
-    cursorY = Math.max(0, cursorY - 1)
+    if(gameState === GameState.Home){
+        if(bombCountIndex + 1 > bombCountOptions.length){
+            bombCountIndex = 1;
+        }else {
+            bombCountIndex += 1;
+        }
+    }
+
+    if(gameState === GameState.Playing){
+        music.play(music.melodyPlayable(music.footstep), music.PlaybackMode.InBackground)
+        cursorY = Math.max(0, cursorY - 1)
+    }
 })
 controller.down.onEvent(ControllerButtonEvent.Pressed, function () {
-    music.play(music.melodyPlayable(music.footstep), music.PlaybackMode.InBackground)
-    cursorY = Math.min(resolution - 1, cursorY + 1)
+    if (gameState === GameState.Home) {
+        if (bombCountIndex - 1 < 0) {
+            bombCountIndex = bombCountOptions.length;
+        } else {
+            bombCountIndex -= 1;
+        }
+    }
+
+    if (gameState === GameState.Playing) {
+        music.play(music.melodyPlayable(music.footstep), music.PlaybackMode.InBackground)
+        cursorY = Math.min(resolution - 1, cursorY + 1)
+    }
 })
 
 controller.B.onEvent(ControllerButtonEvent.Pressed, function () {
@@ -173,17 +238,17 @@ controller.A.onEvent(ControllerButtonEvent.Pressed, function () {
 
     const currentTile = pole[cursorY][cursorX];
 
-    if(firstTurn){
+    if (firstTurn) {
         currentTile.firstTile = true;
         distributeBombs();
         firstTurn = false;
     }
 
-    if(currentTile.marked){
+    if (currentTile.marked) {
         return;
     }
 
-    if(currentTile.state === status.occupied){
+    if (currentTile.state === status.occupied) {
         currentTile.revealed = true;
         console.log("BOOM");
         return;
@@ -240,7 +305,7 @@ function surroundingBombs(x: number, y: number): number {
 
     for (let dy = -1; dy <= 1; dy++) {
         for (let dx = -1; dx <= 1; dx++) {
-            if (dx === 0 && dy === 0){
+            if (dx === 0 && dy === 0) {
                 continue;
             };
 
@@ -258,33 +323,33 @@ function surroundingBombs(x: number, y: number): number {
     return count
 }
 
-function revealTile(x: number, y: number){
+function revealTile(x: number, y: number) {
 
     const tile = pole[y][x];
 
-    if(tile.revealed || tile.marked){
+    if (tile.revealed || tile.marked) {
         return;
     }
 
     tile.revealed = true;
 
-    if(tile.state === status.occupied){
+    if (tile.state === status.occupied) {
         return;
     }
 
     const count = surroundingBombs(x, y);
 
-    if(count === 0){
-        for(let dy = -1; dy <= 1; dy++){
-            for(let dx = -1; dx <= 1; dx++){
-                if(dx === 0 && dy === 0){
+    if (count === 0) {
+        for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+                if (dx === 0 && dy === 0) {
                     continue;
                 }
 
                 const nx = x + dx;
                 const ny = y + dy;
 
-                if(nx >= 0 && nx < resolution && ny >= 0 && ny < resolution){
+                if (nx >= 0 && nx < resolution && ny >= 0 && ny < resolution) {
                     revealTile(nx, ny);
                 }
             }
@@ -294,7 +359,7 @@ function revealTile(x: number, y: number){
 
 game.onPaint(function () {
 
-scene.setBackgroundImage(img`
+    scene.setBackgroundImage(img`
     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
     ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
@@ -422,17 +487,17 @@ scene.setBackgroundImage(img`
             const t = pole[y][x]
             let imgToDraw: Image = tileFreeImg;
 
-            if(t.marked){
+            if (t.marked) {
                 imgToDraw = tileMarkedImg;
-            }else if(t.revealed){
-                if(t.state === status.occupied){
+            } else if (t.revealed) {
+                if (t.state === status.occupied) {
                     imgToDraw = tileRevealedBomb;
                 } else {
                     const count: number = surroundingBombs(x, y)
 
                     imgToDraw = tileNumberImages[count]
                 }
-            }else{
+            } else {
                 imgToDraw = tileFreeImg;
             }
             screen.drawImage(imgToDraw, offsetX + x * tileSize, offsetY + y * tileSize)
