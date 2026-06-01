@@ -3,7 +3,9 @@
     "version": "0.0.0",
     "description": "",
     "dependencies": {
-        "device": "*"
+        "device": "*",
+        "sprite-scaling": "*",
+        "arcade-fancy-text": "github:riknoll/arcade-fancy-text#v0.2.1"
     },
     "files": [
         "README.md",

@@ -1,10 +1,12 @@
 const bombCountOptions: Array<number> = [25, 50, 100]
-let bombCountIndex: number = 2;
+let bombCountIndex: number = 0;
 let bombCount: number = bombCountOptions[bombCountIndex]
-const tileSize: number = 8;
-const screenW = screen.width
-const screenH = screen.height
+const tileSize: number = 10; //Must be a divisor of 160 and 120 with no remainder (screen size)
+const screenW = screen.width //160
+const screenH = screen.height //120 
 const resolution: number = screenH / tileSize;
+const safeTiles: number = resolution ** 2 - bombCount;
+let revealedTiles: number = 0;
 
 const boardW = resolution * tileSize
 const boardH = resolution * tileSize
@@ -16,6 +18,20 @@ let firstTurn: boolean = true;
 let cursorX: number = 7;
 let cursorY: number = 7;
 
+enum status {
+    hasBomb = -1,
+    free = 0
+}
+
+type tile = {
+    state: status,
+    marked: boolean,
+    revealed: boolean,
+    firstTile: boolean,
+    locationX: number,
+    locationY: number
+}
+
 enum GameState {
     Home,
     Playing,
@@ -23,10 +39,14 @@ enum GameState {
 }
 let gameState: GameState = GameState.Home
 
-function startGame(bombs: number) {
+function startGame() {
+    titleMinesSprite.setFlag(SpriteFlag.Invisible, true)
+    startButtonSprite.setFlag(SpriteFlag.Invisible, true)
     firstTurn = true
+    revealedTiles = 0;
     cursorX = Math.idiv(resolution, 2)
     cursorY = Math.idiv(resolution, 2)
+
 
     pole = []
     for (let y = 0; y < resolution; y++) {
@@ -47,122 +67,299 @@ function startGame(bombs: number) {
     gameState = GameState.Playing
 }
 
-function drawHome() {
-    screen.fill(1)
+const titleMinesSprite = sprites.create(img`
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ...........11111.....11111....1111....111d......1111....111111111d..............
+    ..........111111d...111111d..11111d..11111d....11111d..11111111111d.............
+    ..........111111d...111111d..11111d..11111d....11111d..11111111111d.............
+    ..........111111dd.1111111d..11111d..111111d...11111d..11111111111d.............
+    ..........1111111d.1111111d..11111d..111111d...11111d..11111111111d.............
+    ..........1111111111111111d..11111d..1111111d..11111d..1111111dddd..............
+    ..........1111111111111111d..11111d..1111111d..11111d..1111111..................
+    ..........1111111111111111d..11111d..11111111d.11111d..111111...................
+    ..........1111111111111111d..11111d..11111111d.11111d..11111111111..............
+    ..........11111d1111d11111d..11111d..11111111d.11111d..11111111111d.............
+    ..........11111d.11d.11111d..11111d..111111111d11111d..111111dddddd.............
+    ..........11111d..d..11111d..11111d..111111111111111d..111111...................
+    ..........11111d.....11111d..11111d..111111111111111d..1111111..................
+    ..........11111d.....11111d..11111d..11111d.11111111d..11111111111..............
+    ..........11111d.....11111d..11111d..11111d.11111111d..11111111111d.............
+    ..........11111d.....11111d..11111d..11111d..1111111d..11111111111d.............
+    ..........11111d.....11111d..11111d..11111d...111111d..11111111111d.............
+    ..........11111d.....11111d..11111d..11111d...111111d..11111111111d.............
+    ...........dddd.......dddd....dddd....dddd.....ddddd....dddddddddd..............
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    .......1111d.....11111....111111111111....11111111111....1111......1111.........
+    ......111111d...111111d..1111111111111d..1111111111111..11111d....11111d........
+    ......111111d...111111d..1111111111111d..111111111111d..11111d....11111d........
+    ......1111111d.1111111d..1111111111111d..11111ddddddd...11111d....11111d........
+    ......1111111d.1111111d..1111111111111d..1111d..........11111d....11111d........
+    ......11111111d1111111d..1111111111111d..11111d.........11111d....11111d........
+    ......1111111111111111d..11111d..11111d..111111111111...111111d..111111d........
+    ......1111111111111111d..1111d....1111d..111111111111d..111111111111111d........
+    ......1111111111111111d..1111111111111d..111111111111d..111111111111111d........
+    ......1111111111d11111d..1111111111111d...11111111111d..111111111111111d........
+    ......11111d.11d.11111d..1111111111111d.........11111d..111111111111111d........
+    ......11111d..d..11111d..1111111111111d.........11111d..111111111111111d........
+    ......11111d.....11111d..1111111111111d...11111111111d..111111111111111d........
+    ......11111d.....11111d..111111..11111d..111111111111d..111111d..111111d........
+    ......11111d.....11111d..1111d....1111d..111111111111d..111111d...11111d........
+    ......11111d.....11111d..1111d....1111d..111111111111d..11111d....11111d........
+    ......11111d.....11111d..1111d....1111d..111111111111d..11111d....11111d........
+    ......11111d.....11111d..1111d....1111d..111111111111d..11111d....11111d........
+    .......dddd.......dddd....ddd......ddd....ddddddddddd....111d......dddd.........
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+`);
+titleMinesSprite.setPosition((screenW) / 2, 50)
+scaling.scaleByPercent(titleMinesSprite, 50, ScaleDirection.Uniformly, ScaleAnchor.Middle)
 
-    screen.printCenter("MINES", screenH / 2 - 20, 7)
-    screen.printCenter("A = START", screenH / 2, 7)
-    screen.printCenter("B = (later) options", screenH / 2 + 12, 7)
-}
+const titleLostGame = sprites.create(img`
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................11111..11111......11111111111......111.....111..................
+    ...............111111..111111....1111111111111....11111...11111.................
+    ...............111111..111111....1111111111111....11111...11111.................
+    ...............111111..111111....1111111111111....11111...11111.................
+    ...............111111..111111....1111111111111....11111...11111.................
+    ...............111111..111111....11111...11111....11111...11111.................
+    ...............11111111111111....11111...11111....11111...11111.................
+    ...............11111111111111....11111...11111....11111...11111.................
+    ...............11111111111111....11111...11111....11111...11111.................
+    ...............11111111111111....11111...11111....11111...11111.................
+    ................111111111111.....11111...11111....11111...11111.................
+    ...................111111........11111...11111....11111...11111.................
+    ...................111111........11111...11111....11111...11111.................
+    ...................111111........11111...11111....111111.111111.................
+    ...................111111........1111111111111....1111111111111.................
+    ...................111111........1111111111111....1111111111111.................
+    ...................111111........1111111111111....1111111111111.................
+    ...................111111........1111111111111....1111111111111.................
+    ....................1111..........11111111111......1111111111...................
+    ................................................................................
+    ................................................................................
+    ...........1111...........11111111111.....11111111111....1111111111111111.......
+    ..........111111.........1111111111111...1111111111111..111111111111111111......
+    ..........111111.........1111111111111...111111111111d..111111111111111111......
+    ..........111111.........1111111111111...11111ddddddd...111111111111111111......
+    ..........111111.........1111111111111...1111d..........111111111111111111......
+    ..........111111.........11111...11111...11111d..........1111111111111111.......
+    ..........111111.........11111...11111...111111111111.........111111............
+    ..........111111.........11111...11111...111111111111d........111111............
+    ..........111111.........11111...11111...111111111111d........111111............
+    ..........111111.........11111...11111....11111111111d........111111............
+    ..........111111.........11111...11111..........11111d........111111............
+    ..........111111.........11111...11111..........11111d........111111............
+    ..........111111.........11111...11111....11111111111d........111111............
+    ..........11111111111....11111...11111...111111111111d........111111............
+    ..........111111111111...1111111111111...111111111111d........111111............
+    ..........111111111111...1111111111111...111111111111d........111111............
+    ..........111111111111...1111111111111...111111111111d........111111............
+    ..........111111111111...1111111111111...111111111111d........111111............
+    ...........1111111111.....11111111111.....ddddddddddd..........1111.............
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+`);
+titleMinesSprite.setPosition((screenW) / 2, 50)
+scaling.scaleByPercent(titleLostGame, 50, ScaleDirection.Uniformly, ScaleAnchor.Middle)
+titleLostGame.setFlag(SpriteFlag.Invisible, true)
+
+const startButtonSprite: Sprite = sprites.create(img`
+    11111111111111111111111111111111111111111111111111111
+    1...................................................1
+    1...................................................1
+    1....1111111.....1111..111111..1111..11111..111111..1
+    1...111111111...111111.111111.111111.111111.111111..1
+    1..1111...1111..11.......11...11..11.11..11...11....1
+    1..111.....111..11.......11...11..11.11..11...11....1
+    1..111..1..111..11111....11...11..11.11111....11....1
+    1..111..1..111...11111...11...111111.1111.....11....1
+    1..111.....111......11...11...111111.11111....11....1
+    1..111..1..111......11...11...11..11.11111....11....1
+    1..111..1..111......11...11...11..11.11.111...11....1
+    1...111111111...111111...11...11..11.11..11...11....1
+    1....1111111.....1111....11...11..11.11..11...11....1
+    1...................................................1
+    1...................................................1
+    11111111111111111111111111111111111111111111111111111
+`);
+startButtonSprite.setPosition((screenW) / 2, screenH / 2 + 45)
+
+const tileCurrentImg: Image = img`
+    . 2 2 2 2 2 2 2 2 .
+    2 . . . . . . . . 2
+    2 . . . . . . . . 2
+    2 . . . . . . . . 2
+    2 . . . . . . . . 2
+    2 . . . . . . . . 2
+    2 . . . . . . . . 2
+    2 . . . . . . . . 2
+    2 . . . . . . . . 2
+    . 2 2 2 2 2 2 2 2 .
+`
 
 const tileFreeImg: Image = img`
-    b 3 3 3 3 3 3 3
-    b 1 1 1 1 1 1 3
-    b 1 1 1 1 1 1 3
-    b 1 1 1 1 1 1 3
-    b 1 1 1 1 1 1 3
-    b 1 1 1 1 1 1 3
-    b 1 1 1 1 1 1 3
-    b b b b b b b b
+    1 f 1 f 1 f 1 f 1 f
+    f f f f f f f f f 1
+    1 f f f f f f f f f
+    f f f f f f f f f 1
+    1 f f f f f f f f f
+    f f f f f f f f f 1
+    1 f f f f f f f f f
+    f f f f f f f f f 1
+    1 f f f f f f f f f
+    f 1 f 1 f 1 f 1 f 1
 `
 
 const tileMarkedImg: Image = img`
-    b 3 3 3 3 3 3 3
-    b 1 1 2 2 1 1 3
-    b 1 1 2 2 1 1 3
-    b 1 1 2 2 1 1 3
-    b 1 1 2 2 1 1 3
-    b 1 1 1 1 1 1 3
-    b 1 1 2 2 1 1 3
-    b b b b b b b b
+    1 f 1 f 1 f 1 f 1 f
+    f f f f f f f f f 1
+    1 f f f 2 2 f f f f
+    f f f f 2 2 f f f 1
+    1 f f f 2 2 f f f f
+    f f f f 2 2 f f f 1
+    1 f f f f f f f f f
+    f f f f 2 2 f f f 1
+    1 f f f 2 2 f f f f
+    f 1 f 1 f 1 f 1 f 1
 `
 
 const tileNumber0: Image = img`
-    b 3 3 3 3 3 3 3
-    b 1 9 9 9 9 1 3
-    b 1 9 1 1 9 1 3
-    b 1 9 1 1 9 1 3
-    b 1 9 1 1 9 1 3
-    b 1 9 1 1 9 1 3
-    b 1 9 9 9 9 1 3
-    b b b b b b b b
+    1 f 1 f 1 f 1 f 1 f
+    f f f f f f f f f 1
+    1 f f f 9 9 f f f f
+    f f f 9 f f 9 f f 1
+    1 f f 9 f f 9 f f f
+    f f f 9 f f 9 f f 1
+    1 f f 9 f f 9 f f f
+    f f f f 9 9 f f f 1
+    1 f f f f f f f f f
+    f 1 f 1 f 1 f 1 f 1
 `
 
 const tileNumber1: Image = img`
-    b 3 3 3 3 3 3 3
-    b 1 1 1 f 1 1 3
-    b 1 1 f f 1 1 3
-    b 1 f 1 f 1 1 3
-    b 1 1 1 f 1 1 3
-    b 1 1 1 f 1 1 3
-    b 1 f f f f f 3
-    b b b b b b b b
+    1 f 1 f 1 f 1 f 1 f
+    f f f f f f f f f 1
+    1 f f f f 1 f f f f
+    f f f f 1 1 f f f 1
+    1 f f f f 1 f f f f
+    f f f f f 1 f f f 1
+    1 f f f f 1 f f f f
+    f f f f 1 1 1 f f 1
+    1 f f f f f f f f f
+    f 1 f 1 f 1 f 1 f 1
 `
 
 const tileNumber2: Image = img`
-    b 3 3 3 3 3 3 3
-    b 1 1 8 8 1 1 3
-    b 1 8 1 1 8 1 3
-    b 1 1 1 1 8 1 3
-    b 1 1 1 8 1 1 3
-    b 1 1 8 1 1 1 3
-    b 1 8 8 8 8 1 3
-    b b b b b b b b
+    1 f 1 f 1 f 1 f 1 f
+    f f f f f f f f f 1
+    1 f f f 8 8 f f f f
+    f f f 8 f f 8 f f 1
+    1 f f f f f 8 f f f
+    f f f f f 8 f f f 1
+    1 f f f 8 f f f f f
+    f f f 8 8 8 8 f f 1
+    1 f f f f f f f f f
+    f 1 f 1 f 1 f 1 f 1
 `
 
 const tileNumber3: Image = img`
-    b 3 3 3 3 3 3 3
-    b 1 1 6 6 1 1 3
-    b 1 6 1 1 6 1 3
-    b 1 1 1 6 1 1 3
-    b 1 1 1 1 6 1 3
-    b 1 6 1 1 6 1 3
-    b 1 1 6 6 1 1 3
-    b b b b b b b b
+    1 f 1 f 1 f 1 f 1 f
+    f f f f f f f f f 1
+    1 f f f 6 6 f f f f
+    f f f 6 f f 6 f f 1
+    1 f f f f f 6 f f f
+    f f f f 6 6 f f f 1
+    1 f f f f f 6 f f f
+    f f f 6 f f 6 f f 1
+    1 f f f 6 6 f f f f
+    f 1 f 1 f 1 f 1 f 1
 `
 
 const tileNumber4: Image = img`
-    b 3 3 3 3 3 3 3
-    b 1 a 1 1 1 1 3
-    b 1 a 1 1 1 1 3
-    b 1 a 1 a 1 1 3
-    b 1 a a a a 1 3
-    b 1 1 1 a 1 1 3
-    b 1 1 1 a 1 1 3
-    b b b b b b b b
+    1 f 1 f 1 f 1 f 1 f
+    f f f f f f f f f 1
+    1 f f a f f a f f f
+    f f f a f f a f f 1
+    1 f f a f f a f f f
+    f f f f a a a f f 1
+    1 f f f f f a f f f
+    f f f f f f a f f 1
+    1 f f f f f f f f f
+    f 1 f 1 f 1 f 1 f 1
 `
 
 const tileNumber5: Image = img`
-    b 3 3 3 3 3 3 3
-    b 1 c c c c 1 3
-    b 1 c 1 1 1 1 3
-    b 1 1 c c 1 1 3
-    b 1 1 1 1 c 1 3
-    b 1 c 1 1 c 1 3
-    b 1 1 c c 1 1 3
-    b b b b b b b b
+    1 f 1 f 1 f 1 f 1 f
+    f f f f f f f f f 1
+    1 f f c c c c f f f
+    f f f c f f f f f 1
+    1 f f c f f f f f f
+    f f f f c c f f f 1
+    1 f f f f f c f f f
+    f f f c f f c f f 1
+    1 f f f c c f f f f
+    f 1 f 1 f 1 f 1 f 1
 `
 
 const tileNumber6: Image = img`
-    b 3 3 3 3 3 3 3
-    b 1 1 4 4 4 1 3
-    b 1 4 1 1 1 1 3
-    b 1 4 1 1 1 1 3
-    b 1 4 4 4 4 1 3
-    b 1 4 1 1 4 1 3
-    b 1 4 4 4 4 1 3
-    b b b b b b b b
+    1 f 1 f 1 f 1 f 1 f
+    f f f f f f f f f 1
+    1 f f f 4 4 4 f f f
+    f f f 4 f f f f f 1
+    1 f f 4 f f f f f f
+    f f f 4 4 4 f f f 1
+    1 f f 4 f f 4 f f f
+    f f f 4 f f 4 f f 1
+    1 f f f 4 4 f f f f
+    f 1 f 1 f 1 f 1 f 1
 `
 
 const tileNumber7: Image = img`
-    b 3 3 3 3 3 3 3
-    b d 5 5 5 1 1 3
-    b 1 1 1 5 1 1 3
-    b d 1 d 5 d 1 3
-    b 1 1 5 5 5 1 3
-    b 1 1 1 5 1 1 3
-    b 1 1 1 5 1 1 3
-    b b b b b b b b
+    1 f 1 f 1 f 1 f 1 f
+    f f f f f f f f f 1
+    1 f f 5 5 5 f f f f
+    f f f f f 5 f f f 1
+    1 f f f f 5 f f f f
+    f f f f 5 5 5 f f 1
+    1 f f f f 5 f f f f
+    f f f f f 5 f f f 1
+    1 f f f f f f f f f
+    f 1 f 1 f 1 f 1 f 1
 `
 
 const tileNumber8: Image = img`
@@ -189,27 +386,27 @@ const tileRevealedBomb: Image = img`
 const tileNumberImages: Array<Image> = [tileNumber0, tileNumber1, tileNumber2, tileNumber3, tileNumber4, tileNumber5, tileNumber6, tileNumber7, tileNumber8, tileRevealedBomb]
 
 controller.left.onEvent(ControllerButtonEvent.Pressed, function () {
-    if(gameState === GameState.Playing){
+    if (gameState === GameState.Playing) {
         music.play(music.melodyPlayable(music.footstep), music.PlaybackMode.InBackground)
         cursorX = Math.max(0, cursorX - 1)
     }
 })
 controller.right.onEvent(ControllerButtonEvent.Pressed, function () {
-    if(gameState === GameState.Playing){
+    if (gameState === GameState.Playing) {
         music.play(music.melodyPlayable(music.footstep), music.PlaybackMode.InBackground)
         cursorX = Math.min(resolution - 1, cursorX + 1)
     }
 })
 controller.up.onEvent(ControllerButtonEvent.Pressed, function () {
-    if(gameState === GameState.Home){
-        if(bombCountIndex + 1 > bombCountOptions.length){
-            bombCountIndex = 1;
-        }else {
+    if (gameState === GameState.Home) {
+        if (bombCountIndex + 1 === bombCountOptions.length) {
+            bombCountIndex = 0;
+        } else {
             bombCountIndex += 1;
         }
     }
 
-    if(gameState === GameState.Playing){
+    if (gameState === GameState.Playing) {
         music.play(music.melodyPlayable(music.footstep), music.PlaybackMode.InBackground)
         cursorY = Math.max(0, cursorY - 1)
     }
@@ -217,7 +414,7 @@ controller.up.onEvent(ControllerButtonEvent.Pressed, function () {
 controller.down.onEvent(ControllerButtonEvent.Pressed, function () {
     if (gameState === GameState.Home) {
         if (bombCountIndex - 1 < 0) {
-            bombCountIndex = bombCountOptions.length;
+            bombCountIndex = bombCountOptions.length-1;
         } else {
             bombCountIndex -= 1;
         }
@@ -230,73 +427,65 @@ controller.down.onEvent(ControllerButtonEvent.Pressed, function () {
 })
 
 controller.B.onEvent(ControllerButtonEvent.Pressed, function () {
-    music.play(music.melodyPlayable(music.thump), music.PlaybackMode.InBackground)
-    pole[cursorY][cursorX].marked = !pole[cursorY][cursorX].marked
+    if(gameState === GameState.Playing && pole[cursorY][cursorX].revealed === false){
+        music.play(music.melodyPlayable(music.thump), music.PlaybackMode.InBackground)
+        pole[cursorY][cursorX].marked = !pole[cursorY][cursorX].marked
+    }
 })
 
 controller.A.onEvent(ControllerButtonEvent.Pressed, function () {
-
-    const currentTile = pole[cursorY][cursorX];
-
-    if (firstTurn) {
-        currentTile.firstTile = true;
-        distributeBombs();
-        firstTurn = false;
+    if(gameState === GameState.Home){
+        startGame()
     }
 
-    if (currentTile.marked) {
-        return;
-    }
+    if (gameState === GameState.Playing){
+        const currentTile = pole[cursorY][cursorX];
 
-    if (currentTile.state === status.occupied) {
-        currentTile.revealed = true;
-        console.log("BOOM");
-        return;
-    }
+        if(firstTurn){
+            firstTurnSafety(cursorX, cursorY)
+            distributeBombs();
+            firstTurn = false;
+        }
 
-    revealTile(cursorX, cursorY)
+        if (currentTile.marked) {
+            return;
+        }
+
+        if (currentTile.state === status.hasBomb) {
+            currentTile.revealed = true;
+            gameState = GameState.GameOver
+            return;
+        }
+
+        revealTile(cursorX, cursorY)
+    }
 })
 
+function firstTurnSafety(cursorX: number, cursorY: number){
+    
+    for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
 
-enum status {
-    occupied = -1,
-    free = 0
-}
+            const nx = cursorX + dx
+            const ny = cursorY + dy
 
-type tile = {
-    state: status,
-    marked: boolean,
-    revealed: boolean,
-    firstTile: boolean,
-    locationX: number,
-    locationY: number
-}
-
-for (let y: number = 0; y < resolution; y++) {
-    let row: Array<tile> = []
-    for (let x: number = 0; x < resolution; x++) {
-        let tile: tile = {
-            state: status.free,
-            marked: false,
-            revealed: false,
-            firstTile: false,
-            locationY: y,
-            locationX: x
+            if (nx >= 0 && nx < resolution && ny >= 0 && ny < resolution) {
+                pole[ny][nx].firstTile = true;
+            }
         }
-        row.push(tile)
     }
-    pole.push(row)
 }
 
 function distributeBombs() {
+    bombCount = bombCountOptions[bombCountIndex]
     for (let i = 0; i < bombCount; i++) {
         let bombX: number = randint(0, resolution - 1)
         let bombY: number = randint(0, resolution - 1)
-        while (pole[bombY][bombX].state === status.occupied || pole[bombY][bombX].firstTile) {
+        while (pole[bombY][bombX].state === status.hasBomb || pole[bombY][bombX].firstTile) {
             bombX = randint(0, resolution - 1)
             bombY = randint(0, resolution - 1)
         }
-        pole[bombY][bombX].state = status.occupied
+        pole[bombY][bombX].state = status.hasBomb
     }
 }
 
@@ -313,7 +502,7 @@ function surroundingBombs(x: number, y: number): number {
             const ny = y + dy
 
             if (nx >= 0 && nx < resolution && ny >= 0 && ny < resolution) {
-                if (pole[ny][nx].state === status.occupied) {
+                if (pole[ny][nx].state === status.hasBomb) {
                     count++
                 }
             }
@@ -332,8 +521,9 @@ function revealTile(x: number, y: number) {
     }
 
     tile.revealed = true;
+    revealedTiles++
 
-    if (tile.state === status.occupied) {
+    if (tile.state === status.hasBomb) {
         return;
     }
 
@@ -355,133 +545,10 @@ function revealTile(x: number, y: number) {
             }
         }
     }
+    console.log(revealedTiles)
 }
 
-game.onPaint(function () {
-
-    scene.setBackgroundImage(img`
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-    ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff
-`)
-
+function drawGame (){
     for (let y = 0; y < resolution; y++) {
         for (let x = 0; x < resolution; x++) {
             const t = pole[y][x]
@@ -490,7 +557,7 @@ game.onPaint(function () {
             if (t.marked) {
                 imgToDraw = tileMarkedImg;
             } else if (t.revealed) {
-                if (t.state === status.occupied) {
+                if (t.state === status.hasBomb) {
                     imgToDraw = tileRevealedBomb;
                 } else {
                     const count: number = surroundingBombs(x, y)
@@ -503,5 +570,28 @@ game.onPaint(function () {
             screen.drawImage(imgToDraw, offsetX + x * tileSize, offsetY + y * tileSize)
         }
     }
-    screen.drawRect(offsetX + cursorX * tileSize, offsetY + cursorY * tileSize, tileSize, tileSize, 2)
+    screen.drawTransparentImage(tileCurrentImg, offsetX + cursorX * tileSize, offsetY + cursorY * tileSize)
+}
+
+function drawHome() {
+    screen.fill(0)
+    screen.printCenter(`Bomb Count: ${bombCountOptions[bombCountIndex]}`, screenH / 2 + 20, 1)
+}
+
+function drawFail() {
+    screen.fill(0)
+    titleLostGame.setFlag(SpriteFlag.Invisible, false)
+    
+}
+
+game.onPaint(function () {
+    if(gameState === GameState.Playing){
+      drawGame()
+    }
+    if(gameState === GameState.Home) {
+        drawHome()
+    }
+    if(gameState === GameState.GameOver) {
+        drawFail()
+    }
 })
