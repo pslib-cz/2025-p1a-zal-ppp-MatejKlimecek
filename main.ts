@@ -35,19 +35,21 @@ type tile = {
 enum GameState {
     Home,
     Playing,
+    Won,
     GameOver
 }
 let gameState: GameState = GameState.Home
 
 function startGame() {
-    titleMinesSprite.setFlag(SpriteFlag.Invisible, true)
-    startButtonSprite.setFlag(SpriteFlag.Invisible, true)
-    titleLostGame.setFlag(SpriteFlag.Invisible, true)
-    restartButtonSprite.setFlag(SpriteFlag.Invisible, true)
-    menuButtonSprite.setFlag(SpriteFlag.Invisible, true)
-    mineIncreaseNote.setFlag(SpriteFlag.Invisible, true)
-    brokenPillar.setFlag(SpriteFlag.Invisible, false)
-    pillarLeft.setFlag(SpriteFlag.Invisible, true)
+    hideSprite(titleMinesSprite, true)
+    hideSprite(startButtonSprite, true)
+    hideSprite(titleLostGame, true)
+    hideSprite(restartButtonSprite, true)
+    hideSprite(menuButtonSprite, true)
+    hideSprite(mineIncreaseNote, true)
+    hideSprite(brokenPillar, false)
+    hideSprite(pillarLeft, true)
+    hideSprite(clock, false)
     firstTurn = true
     revealedTiles = 0;
     cursorX = Math.idiv(resolution, 2)
@@ -72,6 +74,26 @@ function startGame() {
 
     gameState = GameState.Playing
 }
+
+const clock: Sprite = sprites.create(img`
+    f f f f 1 1 1 1 1 1 1 f f f f
+    f f 1 1 f f f 1 f f f 1 1 f f
+    f 1 1 f f f f 1 f f f f 1 1 f
+    f 1 f 1 f f f f f f f 1 f 1 f
+    1 f f f f f f f f 1 f f f f 1
+    1 f f f f f f f 1 f f f f f 1
+    1 f f f f f f f 1 f f f f f 1
+    1 1 1 f f f f 1 f f f f 1 1 1
+    1 f f f f f f f 1 f f f f f 1
+    1 f f f f f f f f f f f f f 1
+    1 f f f f f f f f f f f f f 1
+    f 1 f 1 f f f f f f f 1 f 1 f
+    f 1 1 f f f f 1 f f f f 1 1 f
+    f f 1 1 f f f 1 f f f 1 1 f f
+    f f f f 1 1 1 1 1 1 1 f f f f
+`)
+clock.setPosition(10, 10)
+hideSprite(clock, true)
 
 const mineIncreaseNote: Sprite = sprites.create(img`
     . . . . . . . . . . . . . . . .
@@ -473,7 +495,73 @@ const titleLostGame = sprites.create(img`
 `);
 titleLostGame.setPosition((screenW) / 2, 50)
 scaling.scaleByPercent(titleLostGame, 50, ScaleDirection.Uniformly, ScaleAnchor.Middle)
-titleLostGame.setFlag(SpriteFlag.Invisible, true)
+hideSprite(titleLostGame, true)
+
+const titleWonGame = sprites.create(img`
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................11111...1111d.....11111111111d.....111d....111d.................
+    ...............111111...11111d...1111111111111d...11111d..11111d................
+    ...............111111...11111d...1111111111111d...11111d..11111d................
+    ...............111111...11111d...1111111111111d...11111d..11111d................
+    ...............111111...11111d...1111111111111d...11111d..11111d................
+    ...............1111111.111111d...11111d..11111d...11111d..11111d................
+    ...............11111111111111d...11111d..11111d...11111d..11111d................
+    ...............11111111111111d...11111d..11111d...11111d..11111d................
+    ...............11111111111111d...11111d..11111d...11111d..11111d................
+    ...............11111111111111d...11111d..11111d...11111d..11111d................
+    ................111111111111d....11111d..11111d...11111d..11111d................
+    ...................111111ddd.....11111d..11111d...11111d..11111d................
+    ...................111111d.......11111d..11111d...11111d..11111d................
+    ...................111111d.......11111d..11111d...111111d111111d................
+    ...................111111d.......1111111111111d...1111111111111d................
+    ...................111111d.......1111111111111d...1111111111111d................
+    ...................111111d.......1111111111111d...1111111111111d................
+    ...................111111d.......1111111111111....1111111111111d................
+    ....................1111d.........11111111111d.....11111111111d.................
+    .....................ddd...........dddddddddd.......dddddddddd..................
+    ................................................................................
+    ......................................11111111111d...1111d......1111d...........
+    ............111111d...1111d...11111d.1111111111111d..1111d.....11111d...........
+    ............111111d...1111d...11111d.1111111111111d..11111d....11111d...........
+    ............111111d...1111d...11111d.1111111111111d..11111d....11111d...........
+    .............111111d.111111d.11111d..1111111111111d..111111d...11111d...........
+    .............111111d.111111d.11111d..11111d..11111d..111111d...11111d...........
+    .............111111d.111111d.11111d..11111d..11111d..1111111d..11111d...........
+    ..............1111111111111111111d...11111d..11111d..1111111d..11111d...........
+    ..............1111111111111111111d...11111d..11111d..11111111d.11111d...........
+    ..............1111111111111111111d...11111d..11111d..11111111d.11111d...........
+    ...............11111111111111111d....11111d..11111d..11111111d.11111d...........
+    ...............11111111d11111111d....11111d..11111d..111111111d11111d...........
+    ...............11111111d11111111d....11111d..11111d..111111111111111d...........
+    ................111111d..111111d.....11111d..11111d..111111111111111d...........
+    ................111111d..111111d.....1111111111111d..11111d.11111111d...........
+    ................111111d..111111d.....1111111111111d..11111d.11111111d...........
+    .................1111d....1111d......1111111111111d..11111d..1111111d...........
+    .................1111d....1111d......1111111111111d..11111d...111111d...........
+    .................1111d....1111d.......11111111111d...11111d...111111d...........
+    .................dddd.....dddd.........dddddddddd.....dddd.....ddddd............
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+    ................................................................................
+`);
+titleWonGame.setPosition((screenW) / 2, 50)
+scaling.scaleByPercent(titleWonGame, 50, ScaleDirection.Uniformly, ScaleAnchor.Middle)
+hideSprite(titleWonGame, true)
 
 const startButtonSprite: Sprite = sprites.create(img`
     11111111111111111111111111111111111111111111111111111
@@ -516,7 +604,7 @@ const restartButtonSprite: Sprite = sprites.create(img`
     11111111111111111111111111111111111111111111111111111111111111111
 `);
 restartButtonSprite.setPosition((screenW) / 2, screenH / 2 + 25)
-restartButtonSprite.setFlag(SpriteFlag.Invisible, true)
+hideSprite(restartButtonSprite, true)
 
 const menuButtonSprite: Sprite = sprites.create(img`
     11111111111111111111111111111111111111111111111111111
@@ -538,7 +626,7 @@ const menuButtonSprite: Sprite = sprites.create(img`
     11111111111111111111111111111111111111111111111111111
 `);
 menuButtonSprite.setPosition((screenW) / 2, screenH / 2 + 45)
-menuButtonSprite.setFlag(SpriteFlag.Invisible, true)
+hideSprite(menuButtonSprite, true)
 
 const tileCurrentImg: Image = img`
     . 2 2 2 2 2 2 2 2 .
@@ -706,6 +794,8 @@ const tileRevealedBomb: Image = img`
 `
 const tileNumberImages: Array<Image> = [tileNumber0, tileNumber1, tileNumber2, tileNumber3, tileNumber4, tileNumber5, tileNumber6, tileNumber7, tileNumber8, tileRevealedBomb]
 
+
+
 controller.left.onEvent(ControllerButtonEvent.Pressed, function () {
     if (gameState === GameState.Playing) {
         music.play(music.melodyPlayable(music.footstep), music.PlaybackMode.InBackground)
@@ -785,6 +875,10 @@ controller.A.onEvent(ControllerButtonEvent.Pressed, function () {
         revealTile(cursorX, cursorY)
     }
 })
+
+function hideSprite(sprite: Sprite, hide: boolean){
+    sprite.setFlag(SpriteFlag.Invisible, hide)
+}
 
 function firstTurnSafety(cursorX: number, cursorY: number){
     
@@ -870,12 +964,16 @@ function revealTile(x: number, y: number) {
             }
         }
     }
+
+    if(revealedTiles === safeTiles){
+        gameState = GameState.Won
+    }
     console.log(revealedTiles)
 }
 
 function drawGame (){
     let gameTimeSeconds: number = Math.trunc(game.runtime() / 1000)
-    screen.print(`${gameTimeSeconds}`, 5, 3)
+    screen.print(`${gameTimeSeconds}`, 2, 20)
 
     for (let y = 0; y < resolution; y++) {
         for (let x = 0; x < resolution; x++) {
@@ -903,24 +1001,43 @@ function drawGame (){
 
 function drawHome() {
     screen.fill(0)
-    titleMinesSprite.setFlag(SpriteFlag.Invisible, false)
-    startButtonSprite.setFlag(SpriteFlag.Invisible, false)
-    titleLostGame.setFlag(SpriteFlag.Invisible, true)
-    restartButtonSprite.setFlag(SpriteFlag.Invisible, true)
-    menuButtonSprite.setFlag(SpriteFlag.Invisible, true)
-    mineIncreaseNote.setFlag(SpriteFlag.Invisible, false)
-    brokenPillar.setFlag(SpriteFlag.Invisible, true)
+    hideSprite(titleMinesSprite, false)
+    hideSprite(startButtonSprite, false)
+    hideSprite(titleLostGame, true)
+    hideSprite(restartButtonSprite, true)
+    hideSprite(menuButtonSprite, true)
+    hideSprite(mineIncreaseNote, false)
+    hideSprite(brokenPillar, true)
     screen.printCenter(`Bomb Count: ${bombCountOptions[bombCountIndex]}`, screenH / 2 + 20, 1)
 }
 
+function drawWin() {
+    hideSprite(titleMinesSprite, true)
+    hideSprite(startButtonSprite, true)
+    hideSprite(restartButtonSprite, false)
+    hideSprite(menuButtonSprite, false)
+    hideSprite(mineIncreaseNote, true)
+    hideSprite(brokenPillar, true)
+    hideSprite(pillarLeft, false)
+    hideSprite(pillarRight, false)
+    hideSprite(titleWonGame, false)
+    hideSprite(clock, true)
+    screen.fill(0)
+
+    let finishTime: number = Math.trunc(game.runtime() / 1000)
+    screen.print(`Final Time:\n${finishTime}`, screenH / 2 + 20, 1)
+}
+
 function drawFail() {
-    titleMinesSprite.setFlag(SpriteFlag.Invisible, true)
-    startButtonSprite.setFlag(SpriteFlag.Invisible, true)
-    titleLostGame.setFlag(SpriteFlag.Invisible, false)
-    restartButtonSprite.setFlag(SpriteFlag.Invisible, false)
-    menuButtonSprite.setFlag(SpriteFlag.Invisible, false)
-    mineIncreaseNote.setFlag(SpriteFlag.Invisible, true)
-    brokenPillar.setFlag(SpriteFlag.Invisible, true)
+    hideSprite(titleMinesSprite, true)
+    hideSprite(startButtonSprite, true)
+    hideSprite(titleLostGame, false)
+    hideSprite(restartButtonSprite, false)
+    hideSprite(menuButtonSprite, false)
+    hideSprite(mineIncreaseNote, true)
+    hideSprite(brokenPillar, true)
+    hideSprite(pillarLeft, false)
+    hideSprite(clock, true)
     screen.fill(0)
 }
 
@@ -933,5 +1050,8 @@ game.onPaint(function () {
     }
     if(gameState === GameState.GameOver) {
         drawFail()
+    }
+    if(gameState === GameState.Won){
+        drawWin()
     }
 })
