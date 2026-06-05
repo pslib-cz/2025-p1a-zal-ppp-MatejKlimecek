@@ -1,12 +1,14 @@
-const bombCountOptions: Array<number> = [25, 50, 100]
+const bombCountOptions: Array<number> = [6, 50, 100]
 let bombCountIndex: number = 0;
 let bombCount: number = bombCountOptions[bombCountIndex]
 const tileSize: number = 10; //Must be a divisor of 160 and 120 with no remainder (screen size)
 const screenW = screen.width //160
 const screenH = screen.height //120 
 const resolution: number = screenH / tileSize;
-const safeTiles: number = resolution ** 2 - bombCount;
+let safeTiles: number = 0;
 let revealedTiles: number = 0;
+let gameStartTime: number = 0;
+let finalTime: number = 0;
 
 const boardW = resolution * tileSize
 const boardH = resolution * tileSize
@@ -52,6 +54,7 @@ function startGame() {
     hideSprite(clock, false)
     firstTurn = true
     revealedTiles = 0;
+    gameStartTime = game.runtime()
     cursorX = Math.idiv(resolution, 2)
     cursorY = Math.idiv(resolution, 2)
 
@@ -772,25 +775,29 @@ const tileNumber7: Image = img`
 `
 
 const tileNumber8: Image = img`
-    b 3 3 3 3 3 3 3
-    b 1 1 7 7 1 1 3
-    b 1 7 1 1 7 1 3
-    b 1 1 7 7 1 1 3
-    b 1 7 1 1 7 1 3
-    b 1 7 1 1 7 1 3
-    b 1 1 7 7 1 1 3
-    b b b b b b b b
+    1 f 1 f 1 f 1 f 1 f
+    f f f f f f f f f 1
+    1 f f 7 7 7 7 f f f
+    f f f 7 f f 7 f f 1
+    1 f f 7 f f 7 f f f
+    f f f f 7 7 f f f 1
+    1 f f 7 f f 7 f f f
+    f f f 7 f f 7 f f 1
+    1 f f 7 7 7 7 f f f
+    f 1 f 1 f 1 f 1 f 1
 `
 
 const tileRevealedBomb: Image = img`
-    b 3 3 3 3 3 3 3
-    b d 1 1 4 f 4 3
-    b 1 1 4 f 4 1 3
-    b d 4 2 2 4 d 3
-    b 4 2 d 2 2 4 3
-    b 4 2 2 2 2 4 3
-    b 1 4 2 2 4 1 3
-    b b b b b b b b
+    1 f 1 f 1 f 1 f 1 f
+    f f f f 2 4 2 f f 1
+    1 f f 2 4 1 4 2 f f
+    f f 2 4 1 4 4 2 f 1
+    1 2 4 1 1 1 1 4 2 f
+    f 2 4 1 1 1 1 4 2 1
+    1 2 4 1 1 1 1 4 2 f
+    f 2 4 1 1 1 1 4 2 1
+    1 f 2 4 4 4 4 2 f f
+    f 1 f 1 f 1 f 1 f 1
 `
 const tileNumberImages: Array<Image> = [tileNumber0, tileNumber1, tileNumber2, tileNumber3, tileNumber4, tileNumber5, tileNumber6, tileNumber7, tileNumber8, tileRevealedBomb]
 
@@ -869,6 +876,7 @@ controller.A.onEvent(ControllerButtonEvent.Pressed, function () {
         if (currentTile.state === status.hasBomb) {
             currentTile.revealed = true;
             gameState = GameState.GameOver
+            finalTime = Math.trunc((game.runtime() - gameStartTime) / 1000)
             return;
         }
 
@@ -897,6 +905,7 @@ function firstTurnSafety(cursorX: number, cursorY: number){
 
 function distributeBombs() {
     bombCount = bombCountOptions[bombCountIndex]
+    safeTiles = resolution ** 2 - bombCount
     for (let i = 0; i < bombCount; i++) {
         let bombX: number = randint(0, resolution - 1)
         let bombY: number = randint(0, resolution - 1)
@@ -972,7 +981,7 @@ function revealTile(x: number, y: number) {
 }
 
 function drawGame (){
-    let gameTimeSeconds: number = Math.trunc(game.runtime() / 1000)
+    let gameTimeSeconds: number = Math.trunc((game.runtime() - gameStartTime) / 1000)
     screen.print(`${gameTimeSeconds}`, 2, 20)
 
     for (let y = 0; y < resolution; y++) {
@@ -987,7 +996,6 @@ function drawGame (){
                     imgToDraw = tileRevealedBomb;
                 } else {
                     const count: number = surroundingBombs(x, y)
-
                     imgToDraw = tileNumberImages[count]
                 }
             } else {
@@ -997,6 +1005,7 @@ function drawGame (){
         }
     }
     screen.drawTransparentImage(tileCurrentImg, offsetX + cursorX * tileSize, offsetY + cursorY * tileSize)
+    
 }
 
 function drawHome() {
@@ -1024,8 +1033,7 @@ function drawWin() {
     hideSprite(clock, true)
     screen.fill(0)
 
-    let finishTime: number = Math.trunc(game.runtime() / 1000)
-    screen.print(`Final Time:\n${finishTime}`, screenH / 2 + 20, 1)
+    screen.print(`Final Time:\n${finalTime}`, screenW / 2 , 1)
 }
 
 function drawFail() {
