@@ -43,6 +43,7 @@ enum GameState {
 let gameState: GameState = GameState.Home
 
 function startGame() {
+    hideSprite(titleWonGame, true)
     hideSprite(titleMinesSprite, true)
     hideSprite(startButtonSprite, true)
     hideSprite(titleLostGame, true)
@@ -850,13 +851,13 @@ controller.B.onEvent(ControllerButtonEvent.Pressed, function () {
         pole[cursorY][cursorX].marked = !pole[cursorY][cursorX].marked
     }
 
-    if(gameState === GameState.GameOver){
+    if(gameState === GameState.GameOver || gameState === GameState.Won){
         gameState = GameState.Home;
     }
 })
 
 controller.A.onEvent(ControllerButtonEvent.Pressed, function () {
-    if (gameState === GameState.Home || gameState === GameState.GameOver){
+    if (gameState !== GameState.Playing){
         startGame()
     }
     
@@ -876,7 +877,7 @@ controller.A.onEvent(ControllerButtonEvent.Pressed, function () {
         if (currentTile.state === status.hasBomb) {
             currentTile.revealed = true;
             gameState = GameState.GameOver
-            finalTime = Math.trunc((game.runtime() - gameStartTime) / 1000)
+            music.play(music.melodyPlayable(music.powerDown), music.PlaybackMode.InBackground)
             return;
         }
 
@@ -975,6 +976,8 @@ function revealTile(x: number, y: number) {
     }
 
     if(revealedTiles === safeTiles){
+        finalTime = Math.trunc((game.runtime() - gameStartTime) / 1000)
+        music.play(music.melodyPlayable(music.powerUp), music.PlaybackMode.InBackground)
         gameState = GameState.Won
     }
     console.log(revealedTiles)
@@ -1017,6 +1020,7 @@ function drawHome() {
     hideSprite(menuButtonSprite, true)
     hideSprite(mineIncreaseNote, false)
     hideSprite(brokenPillar, true)
+    hideSprite(titleWonGame, true)
     screen.printCenter(`Bomb Count: ${bombCountOptions[bombCountIndex]}`, screenH / 2 + 20, 1)
 }
 
@@ -1033,10 +1037,11 @@ function drawWin() {
     hideSprite(clock, true)
     screen.fill(0)
 
-    screen.print(`Final Time:\n${finalTime}`, screenW / 2 , 1)
+    screen.print(`Final Time:${finalTime}`, 40 , 1)
 }
 
 function drawFail() {
+    hideSprite(titleWonGame, true)
     hideSprite(titleMinesSprite, true)
     hideSprite(startButtonSprite, true)
     hideSprite(titleLostGame, false)
