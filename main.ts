@@ -1,4 +1,4 @@
-const bombCountOptions: Array<number> = [6, 50, 100]
+const bombCountOptions: Array<number> = [25, 50, 100]
 let bombCountIndex: number = 0;
 let bombCount: number = bombCountOptions[bombCountIndex]
 const tileSize: number = 10; //Must be a divisor of 160 and 120 with no remainder (screen size)
@@ -980,7 +980,6 @@ function revealTile(x: number, y: number) {
         music.play(music.melodyPlayable(music.powerUp), music.PlaybackMode.InBackground)
         gameState = GameState.Won
     }
-    console.log(revealedTiles)
 }
 
 function drawGame (){
